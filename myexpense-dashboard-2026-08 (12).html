@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <script>window.EMBEDDED_DATA = {};</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyExpense Tracker</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: rgba(255, 255, 255, 0.03);
+            --bg-glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --text-muted: #606070;
+            --accent: #00d4aa;
+            --accent-glow: rgba(0, 212, 170, 0.3);
+            --accent-secondary: #6366f1;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .bg-mesh {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(0, 212, 170, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0, 212, 170, 0.03) 0%, transparent 70%);
+        }
+        .bg-mesh::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px);
+            animation: meshMove 20s linear infinite;
+        }
+        @keyframes meshMove { 0% { transform: translateY(0); } 100% { transform: translateY(50px); } }
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .brand-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .brand h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .brand span { color: var(--accent); }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid var(--border);
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+            transform: translateY(-1px);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #00b894);
+            border: none;
+            color: #000;
+            font-weight: 600;
+        }
+        .btn-primary:hover { box-shadow: 0 4px 20px var(--accent-glow); }
+        .btn-danger {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+        .dropdown { position: relative; }
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 8px;
+            min-width: 220px;
+            box-shadow: var(--shadow);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s ease;
+            z-index: 100;
+        }
+        .dropdown-menu.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border: none;
+            background: none;
+            width: 100%;
+            font-family: 'Inter', sans-serif;
+            text-align: left;
+        }
+        .dropdown-item:hover {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+        }
+        .dropdown-item.danger { color: var(--danger); }
+        .dropdown-item.danger:hover { background: rgba(239, 68, 68, 0.08); }
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 6px 0;
+        }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 28px;
+            background: var(--bg-card);
+            padding: 6px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            width: fit-content;
+        }
+        .tab {
+            padding: 10px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+        }
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            color: #000;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 212, 170, 0.3);
+        }
+        .tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.05);
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        .month-nav button {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .month-nav button:hover {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+        .month-display {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            min-width: 200px;
+            text-align: center;
+            color: var(--text-primary);
+        }
+        .hero-total {
+            text-align: center;
+            padding: 48px 24px;
+            background: linear-gradient(135deg, rgba(0, 212, 170, 0.1), rgba(99, 102, 241, 0.1));
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-total::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(0, 212, 170, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        .hero-label {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .hero-amount {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 4.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+            position: relative;
+            z-index: 1;
+            letter-spacing: -2px;
+        }
+        .hero-sub {
+            margin-top: 12px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 1;
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+        .stat-value.accent { color: var(--accent); }
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+        .stat-value.secondary { color: var(--accent-secondary); }
+        .add-expense-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+        .add-expense-card h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 140px 1fr 1fr 120px auto;
+            gap: 12px;
+            align-items: end;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.1);
+        }
+        .form-group input::placeholder, .form-group textarea::placeholder { color: var(--text-muted); }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.6);
+            cursor: pointer;
+        }
+        .days-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .day-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            animation: slideIn 0.4s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .day-card:hover { border-color: rgba(255,255,255,0.12); }
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: linear-gradient(90deg, rgba(0, 212, 170, 0.05), transparent);
+            border-bottom: 1px solid var(--border);
+        }
+        .day-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .day-number {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #000;
+        }
+        .day-name { font-weight: 600; font-size: 1rem; }
+        .day-date { font-size: 0.8rem; color: var(--text-muted); }
+        .day-total {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .day-entries { padding: 12px 20px; }
+        .entry-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .entry-item:last-child { border-bottom: none; }
+        .entry-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .entry-category {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .entry-desc {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+        .entry-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 8px;
+        }
+        .entry-amount {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .entry-delete {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin-left: 8px;
+            font-size: 1rem;
+        }
+        .entry-delete:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .day-footer {
+            padding: 12px 20px;
+            background: rgba(0, 212, 170, 0.03);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+        }
+        .day-footer-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .day-footer-total {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--accent);
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+        }
+        .chart-card h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        .chart-container {
+            position: relative;
+            height: 320px;
+        }
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        .insight-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .insight-card:hover { border-color: rgba(255,255,255,0.15); }
+        .insight-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .insight-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+        .insight-title { font-size: 0.85rem; color: var(--text-muted); }
+        .insight-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .insight-sub { font-size: 0.8rem; color: var(--text-muted); }
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 14px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            box-shadow: var(--shadow);
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes toastOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            z-index: 999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 500px;
+            width: 100%;
+            animation: modalIn 0.3s ease;
+        }
+        .modal.wide { max-width: 600px; }
+        @keyframes modalIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            margin-bottom: 16px;
+        }
+        .modal p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .share-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.2);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--accent);
+            margin-left: 12px;
+        }
+        .cloud-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--success);
+            margin-left: 8px;
+        }
+        .cloud-badge.offline {
+            background: rgba(96, 96, 112, 0.1);
+            border-color: rgba(96, 96, 112, 0.2);
+            color: var(--text-muted);
+        }
+        .setup-steps {
+            margin: 16px 0;
+            padding: 16px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        .setup-steps h4 {
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        .setup-steps ol {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            padding-left: 18px;
+        }
+        .setup-steps a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .setup-steps a:hover {
+            text-decoration: underline;
+        }
+        .sync-status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        @media (max-width: 768px) {
+            .hero-amount { font-size: 3rem; }
+            .form-grid { grid-template-columns: 1fr; }
+            .analytics-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .month-display { font-size: 1.1rem; min-width: 150px; }
+            .share-badge, .cloud-badge { margin-left: 0; margin-top: 8px; }
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="bg-mesh"></div>
+    <div class="container">
+        <div class="header">
+            <div class="brand">
+                <div class="brand-icon">💰</div>
+                <h1>My<span>Expense</span> Tracker</h1>
+                
+                <span class="cloud-badge offline" id="cloudBadge" style="display: inline-flex;">☁ Local Mode</span>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="saveAndShare()">🔗 Share</button>
+                <div class="dropdown">
+                    <button class="btn" onclick="toggleDropdown(event)">⚙ More</button>
+                    <div class="dropdown-menu" id="moreMenu">
+                        <button class="dropdown-item" onclick="loadDemoData(); hideDropdown();">✨ Load Demo Data</button>
+                        <button class="dropdown-item" id="cloudMenuItem" onclick="showSetupModal(); hideDropdown();" style="display: flex;">☁ Enable Cloud Sync</button>
+                        <button class="dropdown-item" id="disconnectMenuItem" style="display:none;" onclick="disconnectCloud(); hideDropdown();">🔴 Disconnect Cloud</button>
+                        <button class="dropdown-item" onclick="exportData(); hideDropdown();">📥 Export JSON Backup</button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item danger" onclick="showClearModal(); hideDropdown();">🗑 Clear All Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+            <button class="tab" onclick="switchTab('analytics')">📈 Analytics</button>
+        </div>
+
+        <div id="dashboardTab" class="tab-content active">
+            <div class="month-nav">
+                <button onclick="changeMonth(-1)">‹</button>
+                <div class="month-display" id="monthDisplay">August 2026</div>
+                <button onclick="changeMonth(1)">›</button>
+            </div>
+            <div class="hero-total">
+                <div class="hero-label">Total Monthly Expense</div>
+                <div class="hero-amount" id="heroTotal">₹0.00</div>
+                <div class="hero-sub" id="heroSub">Start adding expenses to see your spending</div>
+            </div>
+            <div class="stats-row">
+                <div class="stat-card"><div class="stat-label">Daily Average</div><div class="stat-value accent" id="statAvg">₹0.00</div></div>
+                <div class="stat-card"><div class="stat-label">Highest Day</div><div class="stat-value warning" id="statHigh">₹0.00</div></div>
+                <div class="stat-card"><div class="stat-label">Total Entries</div><div class="stat-value secondary" id="statCount">0</div></div>
+                <div class="stat-card"><div class="stat-label">Days Tracked</div><div class="stat-value" id="statDays">0</div></div>
+            </div>
+            <div class="add-expense-card">
+                <h3>➕ Add Expense</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Date</label><input type="date" id="expDate"></div>
+                    <div class="form-group"><label>Description</label><input type="text" id="expDesc" placeholder="e.g. Coffee, Groceries..."></div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="expCategory">
+                            <option value="food">🍔 Food &amp; Dining</option>
+                            <option value="transport">🚗 Transport</option>
+                            <option value="shopping">🛍 Shopping</option>
+                            <option value="bills">📋 Bills</option>
+                            <option value="entertainment">🎬 Entertainment</option>
+                            <option value="health">💊 Health</option>
+                            <option value="other">📦 Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Amount (₹)</label><input type="number" id="expAmount" placeholder="0.00" step="0.01" min="0"></div>
+                    <button class="btn btn-primary" onclick="addExpense()" style="height: 46px;">Add</button>
+                </div>
+            </div>
+            <div class="days-container" id="daysContainer"><div class="empty-state"><div class="empty-state-icon">📝</div><h3>No expenses for August</h3><p>Add your first expense above to start tracking this month</p></div></div>
+        </div>
+
+        <div id="analyticsTab" class="tab-content">
+            <div class="analytics-grid">
+                <div class="chart-card"><h3>📈 Day-on-Day Spending</h3><div class="chart-container"><canvas id="trendChart" style="display: block; box-sizing: border-box; height: 0px; width: 0px;" height="0" width="0"></canvas></div></div>
+                <div class="chart-card"><h3>🍰 Category Breakdown</h3><div class="chart-container"><canvas id="categoryChart" style="display: block; box-sizing: border-box; height: 0px; width: 0px;" height="0" width="0"></canvas></div></div>
+            </div>
+            <div class="insights-grid" id="insightsGrid"><div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(0,212,170,0.15)">📉</div><div class="insight-title">Spending Trend</div></div><div class="insight-value warning">0%</div><div class="insight-sub">Second half vs first half of month</div></div><div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(245,158,11,0.15)">🔥</div><div class="insight-title">Highest Spend Day</div></div><div class="insight-value warning">₹0.00</div><div class="insight-sub">No data</div></div><div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(16,185,129,0.15)">💚</div><div class="insight-title">Lowest Spend Day</div></div><div class="insight-value" style="color:var(--success)">₹0.00</div><div class="insight-sub">No data</div></div><div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(139,92,246,0.15)">🏷</div><div class="insight-title">Top Category</div></div><div class="insight-value secondary">None</div><div class="insight-sub">No expenses yet</div></div><div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(59,130,246,0.15)">📊</div><div class="insight-title">Avg per Transaction</div></div><div class="insight-value">₹0.00</div><div class="insight-sub">Across all categories</div></div><div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(236,72,153,0.15)">🎯</div><div class="insight-title">Projected Monthly</div></div><div class="insight-value" style="color:#ec4899">₹0.00</div><div class="insight-sub">If spending continues at this rate</div></div></div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="modal-overlay" id="clearModal">
+        <div class="modal">
+            <h3>⚠ Clear All Data?</h3>
+            <p>This will permanently delete all your expense records. This action cannot be undone. Make sure to export your data first if you want to keep it.</p>
+            <div class="modal-actions">
+                <button class="btn" onclick="hideClearModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="clearAllData()">Yes, Clear Everything</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="setupModal">
+        <div class="modal wide">
+            <h3>☁ Enable Cloud Sync</h3>
+            <p>Cloud Sync stores your expenses in a free Firebase database. Share your tracker once, and everyone sees updates automatically in real-time. No more sending files back and forth!</p>
+
+            <div class="setup-steps">
+                <h4>💡 Setup Steps (takes 2 minutes):</h4>
+                <ol>
+                    <li>Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+                    <li>Click <strong>"Create a project"</strong> → name it <strong>"myexpense"</strong> → Continue → Continue → <strong>Create project</strong></li>
+                    <li>In the left sidebar, click <strong>"Realtime Database"</strong> → <strong>"Create Database"</strong></li>
+                    <li>Choose <strong>"Start in test mode"</strong> → click <strong>"Enable"</strong></li>
+                    <li>Click the <strong>gear icon</strong> (Project Settings) at top left</li>
+                    <li>Under <strong>"Your apps"</strong>, click the <strong>"&lt;/&gt;"</strong> (Web) icon</li>
+                    <li>Give it a nickname (e.g., "tracker") → click <strong>"Register app"</strong></li>
+                    <li>Copy the entire <code>firebaseConfig</code> object and paste below</li>
+                </ol>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label>Paste your Firebase config here:</label>
+                <textarea id="firebaseConfigInput" rows="6" placeholder="{
+  &quot;apiKey&quot;: &quot;your-api-key&quot;,
+  &quot;authDomain&quot;: &quot;your-project.firebaseapp.com&quot;,
+  &quot;databaseURL&quot;: &quot;https://your-project-default-rtdb.firebaseio.com&quot;,
+  &quot;projectId&quot;: &quot;your-project&quot;
+}" style="width: 100%; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; color: var(--text-primary); font-family: monospace; font-size: 0.8rem; resize: vertical;"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn" onclick="hideSetupModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="connectFirebase()">🔗 Connect</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CATEGORIES = {
+            food: { label: 'Food & Dining', color: '#f59e0b', icon: '&#127828;' },
+            transport: { label: 'Transport', color: '#3b82f6', icon: '&#128663;' },
+            shopping: { label: 'Shopping', color: '#ec4899', icon: '&#128717;' },
+            bills: { label: 'Bills', color: '#ef4444', icon: '&#128203;' },
+            entertainment: { label: 'Entertainment', color: '#8b5cf6', icon: '&#127916;' },
+            health: { label: 'Health', color: '#10b981', icon: '&#128138;' },
+            other: { label: 'Other', color: '#6b7280', icon: '&#128230;' }
+        };
+
+        const STORAGE_KEY = 'myexpense_tracker_v1';
+        const FIREBASE_CONFIG_KEY = 'myexpense_firebase_config';
+
+        let currentMonth = new Date();
+        let expenses = {};
+        let trendChartInstance = null;
+        let categoryChartInstance = null;
+        let isSharedFile = false;
+        let cloudMode = false;
+        let dbRef = null;
+        let firebaseConfig = null;
+
+        function init() {
+            if (typeof window.EMBEDDED_DATA !== 'undefined' && window.EMBEDDED_DATA && Object.keys(window.EMBEDDED_DATA).length > 0) {
+                expenses = JSON.parse(JSON.stringify(window.EMBEDDED_DATA));
+                isSharedFile = true;
+            }
+
+            if (typeof window.EMBEDDED_FIREBASE_CONFIG !== 'undefined' && window.EMBEDDED_FIREBASE_CONFIG) {
+                try {
+                    initFirebase(window.EMBEDDED_FIREBASE_CONFIG);
+                } catch(e) {
+                    console.error('Failed to init Firebase from embedded config:', e);
+                }
+            }
+
+            if (!cloudMode) {
+                try {
+                    const savedConfig = localStorage.getItem(FIREBASE_CONFIG_KEY);
+                    if (savedConfig) {
+                        initFirebase(JSON.parse(savedConfig));
+                    }
+                } catch(e) {
+                    console.error('Failed to init Firebase from localStorage:', e);
+                }
+            }
+
+            if (!cloudMode && !isSharedFile) {
+                try {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved) expenses = JSON.parse(saved);
+                } catch(e) {
+                    console.error('Failed to load from localStorage:', e);
+                }
+            }
+
+            setupUI();
+            render();
+        }
+
+        function initFirebase(config) {
+            if (typeof firebase === 'undefined') {
+                showToast('&#9888; Firebase SDK not loaded. Check your internet connection and reload the page.');
+                console.error('Firebase SDK not available');
+                return false;
+            }
+
+            try {
+                // Clean config values - remove any accidental whitespace/newlines
+                const cleanConfig = {};
+                for (const key in config) {
+                    if (typeof config[key] === 'string') {
+                        cleanConfig[key] = config[key].replace(/\s+/g, '').trim();
+                    } else {
+                        cleanConfig[key] = config[key];
+                    }
+                }
+
+                // Validate required fields
+                if (!cleanConfig.apiKey) { showToast('&#9888; Config missing apiKey'); return false; }
+                if (!cleanConfig.databaseURL) { showToast('&#9888; Config missing databaseURL'); return false; }
+                if (!cleanConfig.projectId) { showToast('&#9888; Config missing projectId'); return false; }
+
+                console.log('Connecting to Firebase with project:', cleanConfig.projectId);
+
+                // Delete any existing app
+                try { if (firebase.apps.length) firebase.app().delete(); } catch(e) {}
+
+                // Initialize
+                firebase.initializeApp(cleanConfig);
+                dbRef = firebase.database().ref('expenses');
+                firebaseConfig = cleanConfig;
+
+                // Test connection with a ping
+                const testRef = firebase.database().ref('.info/connected');
+                testRef.on('value', (snap) => {
+                    if (snap.val() === true) {
+                        console.log('Firebase connected!');
+                    }
+                });
+
+                // Listen for data changes
+                dbRef.on('value', (snapshot) => {
+                    const data = snapshot.val() || {};
+                    console.log('Data received from cloud:', Object.keys(data).length, 'months');
+                    if (JSON.stringify(data) !== JSON.stringify(expenses)) {
+                        expenses = data;
+                        render();
+                    }
+                }, (err) => {
+                    console.error('Database read error:', err);
+                    showToast('&#9888; Cannot read from database. Check your Firebase rules.');
+                });
+
+                cloudMode = true;
+                updateModeUI();
+
+                // If we have local data, push it to cloud
+                const localData = localStorage.getItem(STORAGE_KEY);
+                if (localData && Object.keys(expenses).length > 0) {
+                    dbRef.set(expenses).catch(e => console.log('Could not sync local data:', e));
+                }
+
+                return true;
+            } catch (err) {
+                console.error('Firebase init failed:', err);
+                showToast('&#10060; Firebase error: ' + (err.message || 'Unknown error'));
+                return false;
+            }
+        }
+
+        function setupUI() {
+            const today = new Date();
+            document.getElementById('expDate').value = today.getFullYear() + '-' + 
+                String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(today.getDate()).padStart(2, '0');
+
+            if (isSharedFile) {
+                document.getElementById('shareBadge').style.display = 'inline-flex';
+            }
+            updateModeUI();
+        }
+
+        function updateModeUI() {
+            const badge = document.getElementById('cloudBadge');
+            const cloudMenuItem = document.getElementById('cloudMenuItem');
+            const disconnectMenuItem = document.getElementById('disconnectMenuItem');
+
+            if (cloudMode) {
+                badge.style.display = 'inline-flex';
+                badge.classList.remove('offline');
+                badge.innerHTML = '&#127758; Cloud Sync';
+                if (cloudMenuItem) cloudMenuItem.style.display = 'none';
+                if (disconnectMenuItem) disconnectMenuItem.style.display = 'flex';
+            } else {
+                badge.style.display = 'inline-flex';
+                badge.classList.add('offline');
+                badge.innerHTML = '&#9729; Local Mode';
+                if (cloudMenuItem) cloudMenuItem.style.display = 'flex';
+                if (disconnectMenuItem) disconnectMenuItem.style.display = 'none';
+            }
+        }
+
+        function saveData() {
+            if (cloudMode && dbRef) {
+                dbRef.set(expenses).catch(err => {
+                    console.error('Firebase save failed:', err);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+                });
+            } else {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+            }
+        }
+
+        function getMonthKey(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0'); }
+        function getDayKey(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
+
+        function toggleDropdown(e) { e.stopPropagation(); document.getElementById('moreMenu').classList.toggle('show'); }
+        function hideDropdown() { document.getElementById('moreMenu').classList.remove('show'); }
+        function setupDropdownClose() {
+            document.addEventListener('click', function(e) {
+                const dropdown = document.querySelector('.dropdown');
+                if (dropdown && !dropdown.contains(e.target)) hideDropdown();
+            });
+        }
+
+        function loadDemoData() {
+            if (Object.keys(expenses).length > 0 && !confirm('This will add demo data to your current records. Continue?')) return;
+            const now = new Date();
+            const monthKey = getMonthKey(now);
+            if (!expenses[monthKey]) expenses[monthKey] = {};
+            const demoEntries = [
+                { day: -2, desc: 'Grocery run', category: 'food', amount: 875.50 },
+                { day: -2, desc: 'Uber to work', category: 'transport', amount: 240.00 },
+                { day: -1, desc: 'Netflix subscription', category: 'entertainment', amount: 199.00 },
+                { day: -1, desc: 'Lunch with team', category: 'food', amount: 420.00 },
+                { day: -1, desc: 'Pharmacy', category: 'health', amount: 324.00 },
+                { day: 0, desc: 'Morning coffee', category: 'food', amount: 65.00 },
+                { day: 0, desc: 'Petrol refill', category: 'transport', amount: 580.00 },
+                { day: 0, desc: 'New headphones', category: 'shopping', amount: 1299.00 },
+                { day: -3, desc: 'Electric bill', category: 'bills', amount: 1450.00 },
+                { day: -3, desc: 'Dinner date', category: 'food', amount: 780.00 },
+                { day: -4, desc: 'Gym membership', category: 'health', amount: 499.00 },
+                { day: -4, desc: 'Stationery', category: 'other', amount: 123.00 },
+                { day: -5, desc: 'Movie tickets', category: 'entertainment', amount: 350.00 },
+                { day: -5, desc: 'Parking fee', category: 'transport', amount: 80.00 },
+                { day: -6, desc: 'Weekend groceries', category: 'food', amount: 1568.00 },
+            ];
+            demoEntries.forEach(entry => {
+                const d = new Date(); d.setDate(d.getDate() + entry.day);
+                const dayKey = getDayKey(d);
+                if (!expenses[monthKey][dayKey]) expenses[monthKey][dayKey] = [];
+                const hour = 8 + Math.floor(Math.random() * 12);
+                const minute = Math.floor(Math.random() * 60);
+                const time = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+                expenses[monthKey][dayKey].push({ desc: entry.desc, category: entry.category, amount: entry.amount, time: time, timestamp: Date.now() - Math.abs(entry.day) * 86400000 });
+            });
+            saveData(); render();
+            showToast('&#10024; Demo data loaded!');
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(expenses, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'myexpense-backup-' + getMonthKey(new Date()) + '.json'; a.click();
+            URL.revokeObjectURL(url);
+            showToast('&#128229; Backup exported!');
+        }
+
+        function saveAndShare() {
+            const dataScript = '<scr' + 'ipt>window.EMBEDDED_DATA = ' + JSON.stringify(expenses) + ';<' + '/scr' + 'ipt>';
+            let firebaseConfigScript = '';
+            if (cloudMode && firebaseConfig) {
+                firebaseConfigScript = '<scr' + 'ipt>window.EMBEDDED_FIREBASE_CONFIG = ' + JSON.stringify(firebaseConfig) + ';<' + '/scr' + 'ipt>';
+            }
+
+            let html = '<!DOCTYPE html>' + String.fromCharCode(10) + document.documentElement.outerHTML;
+
+            html = html.replace(/<scr[\s\S]*?ipt>\s*window\.EMBEDDED_DATA\s*=\s*\{[\s\S]*?\};\s*<\/[\s\S]*?scr[\s\S]*?ipt>\s*/g, '');
+            html = html.replace(/<scr[\s\S]*?ipt>\s*window\.EMBEDDED_FIREBASE_CONFIG\s*=\s*\{[\s\S]*?\};\s*<\/[\s\S]*?scr[\s\S]*?ipt>\s*/g, '');
+            html = html.replace(/<span class="share-badge"[^>]*>.*?<\/span>/, '');
+
+            const headMatch = html.match(/<head[^>]*>/i);
+            if (headMatch) {
+                const insertPos = headMatch.index + headMatch[0].length;
+                const injection = String.fromCharCode(10) + '    ' + dataScript + (firebaseConfigScript ? String.fromCharCode(10) + '    ' + firebaseConfigScript : '');
+                html = html.slice(0, insertPos) + injection + html.slice(insertPos);
+            }
+
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'myexpense-dashboard-' + getMonthKey(new Date()) + '.html';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('&#128279; Shareable file downloaded! Send it to anyone.');
+        }
+
+        function showSetupModal() { document.getElementById('setupModal').classList.add('active'); }
+        function hideSetupModal() { document.getElementById('setupModal').classList.remove('active'); }
+
+        function connectFirebase() {
+            let rawText = document.getElementById('firebaseConfigInput').value.trim();
+            if (!rawText) { showToast('&#9888; Please paste your Firebase config'); return; }
+
+            // Step 1: Clean up common prefixes/suffixes
+            let configText = rawText
+                .replace(/^\s*const\s+firebaseConfig\s*=\s*/, '')
+                .replace(/^\s*var\s+firebaseConfig\s*=\s*/, '')
+                .replace(/^\s*let\s+firebaseConfig\s*=\s*/, '')
+                .replace(/;\s*$/, '')
+                .trim();
+
+            let config = null;
+            let parseError = '';
+
+            // Step 2: Try strict JSON first
+            try {
+                config = JSON.parse(configText);
+            } catch(e) {
+                parseError = 'JSON parse failed: ' + e.message;
+            }
+
+            // Step 3: If strict JSON fails, convert JS object notation to JSON
+            // by wrapping unquoted keys in double quotes
+            if (!config) {
+                try {
+                    // Match keys that are not already in quotes: word characters followed by colon
+                    let jsonLike = configText.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+                    // Also handle trailing commas before } or ]
+                    jsonLike = jsonLike.replace(/,\s*([}\]])/g, '$1');
+                    config = JSON.parse(jsonLike);
+                    parseError = '';
+                } catch(e) {
+                    parseError += ' | JS-to-JSON conversion failed: ' + e.message;
+                }
+            }
+
+            // Step 4: If still no config, try regex extraction as last resort
+            if (!config) {
+                try {
+                    config = {};
+                    const apiKeyMatch = configText.match(/apiKey\s*:\s*"([^"]+)"/);
+                    const authDomainMatch = configText.match(/authDomain\s*:\s*"([^"]+)"/);
+                    const dbUrlMatch = configText.match(/databaseURL\s*:\s*"([^"]+)"/);
+                    const projectIdMatch = configText.match(/projectId\s*:\s*"([^"]+)"/);
+
+                    if (apiKeyMatch) config.apiKey = apiKeyMatch[1];
+                    if (authDomainMatch) config.authDomain = authDomainMatch[1];
+                    if (dbUrlMatch) config.databaseURL = dbUrlMatch[1];
+                    if (projectIdMatch) config.projectId = projectIdMatch[1];
+
+                    // Optional fields
+                    const storageMatch = configText.match(/storageBucket\s*:\s*"([^"]+)"/);
+                    const msgMatch = configText.match(/messagingSenderId\s*:\s*"([^"]+)"/);
+                    const appIdMatch = configText.match(/appId\s*:\s*"([^"]+)"/);
+                    if (storageMatch) config.storageBucket = storageMatch[1];
+                    if (msgMatch) config.messagingSenderId = msgMatch[1];
+                    if (appIdMatch) config.appId = appIdMatch[1];
+
+                    if (config.apiKey && config.databaseURL) {
+                        parseError = '';
+                    } else {
+                        parseError += ' | Regex extraction failed: missing apiKey or databaseURL';
+                    }
+                } catch(e) {
+                    parseError += ' | Regex extraction failed: ' + e.message;
+                }
+            }
+
+            if (!config || !config.apiKey || !config.databaseURL) {
+                showToast('&#10060; Invalid config. Please check and try again.');
+                console.error('Parse errors:', parseError);
+                console.error('Raw input:', rawText.substring(0, 200));
+                return;
+            }
+
+            const success = initFirebase(config);
+            if (success) {
+                localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config));
+                hideSetupModal();
+                showToast('&#127758; Connected to Cloud Sync!');
+            } else {
+                console.log('initFirebase returned false, staying in local mode');
+            }
+        }
+
+        function disconnectCloud() {
+            if (dbRef) { dbRef.off(); dbRef = null; }
+            try { if (firebase.apps.length) firebase.app().delete(); } catch(e) {}
+            cloudMode = false; firebaseConfig = null;
+            localStorage.removeItem(FIREBASE_CONFIG_KEY);
+            updateModeUI();
+            showToast('&#9729; Switched to Local Mode');
+        }
+
+        function showClearModal() { document.getElementById('clearModal').classList.add('active'); }
+        function hideClearModal() { document.getElementById('clearModal').classList.remove('active'); }
+        function clearAllData() {
+            expenses = {}; saveData(); hideClearModal(); render();
+            showToast('&#128465; All data cleared');
+        }
+        function render() {
+            const monthKey = getMonthKey(currentMonth);
+            const monthData = expenses[monthKey] || {};
+            const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            document.getElementById('monthDisplay').textContent = monthNames[currentMonth.getMonth()] + ' ' + currentMonth.getFullYear();
+
+            let totalMonthly = 0, totalEntries = 0, daysWithData = 0, highestDay = 0;
+            let dayTotals = {};
+            Object.entries(monthData).forEach(([dayKey, entries]) => {
+                const daySum = entries.reduce((sum, e) => sum + e.amount, 0);
+                dayTotals[dayKey] = daySum;
+                totalMonthly += daySum; totalEntries += entries.length; daysWithData++;
+                if (daySum > highestDay) highestDay = daySum;
+            });
+
+            document.getElementById('heroTotal').textContent = formatCurrency(totalMonthly);
+            document.getElementById('heroSub').textContent = daysWithData > 0 ? daysWithData + ' day' + (daysWithData !== 1 ? 's' : '') + ' tracked &bull; ' + totalEntries + ' transaction' + (totalEntries !== 1 ? 's' : '') : 'Start adding expenses to see your spending';
+
+            const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+            const avg = daysWithData > 0 ? totalMonthly / daysWithData : 0;
+            document.getElementById('statAvg').textContent = formatCurrency(avg);
+            document.getElementById('statHigh').textContent = formatCurrency(highestDay);
+            document.getElementById('statCount').textContent = totalEntries;
+            document.getElementById('statDays').textContent = daysWithData;
+
+            const container = document.getElementById('daysContainer');
+            const sortedDays = Object.keys(monthData).sort().reverse();
+            if (sortedDays.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128221;</div><h3>No expenses for ' + monthNames[currentMonth.getMonth()] + '</h3><p>Add your first expense above to start tracking this month</p></div>';
+            } else {
+                container.innerHTML = sortedDays.map(dayKey => {
+                    const entries = monthData[dayKey];
+                    const daySum = entries.reduce((s, e) => s + e.amount, 0);
+                    const date = new Date(dayKey + 'T00:00:00');
+                    const dayNum = date.getDate();
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+                    const isToday = dayKey === getDayKey(new Date());
+                    return '<div class="day-card"><div class="day-header"><div class="day-info"><div class="day-number">' + dayNum + '</div><div><div class="day-name">' + dayName + (isToday ? ' <span style="color:var(--accent);font-size:0.8rem;">&bull; Today</span>' : '') + '</div><div class="day-date">' + date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) + '</div></div></div><div class="day-total">' + formatCurrency(daySum) + '</div></div><div class="day-entries">' + entries.map((entry, idx) => '<div class="entry-item"><div class="entry-left"><div class="entry-category" style="background:' + (CATEGORIES[entry.category]?.color || '#666') + '"></div><span class="entry-desc">' + (CATEGORIES[entry.category]?.icon || '&#128230;') + ' ' + escapeHtml(entry.desc) + '</span><span class="entry-time">' + entry.time + '</span></div><div><span class="entry-amount">' + formatCurrency(entry.amount) + '</span><button class="entry-delete" onclick="deleteEntry(\'' + dayKey + '\', ' + idx + ')" title="Delete">&times;</button></div></div>').join('') + '</div><div class="day-footer"><span class="day-footer-label">Daily Total</span><span class="day-footer-total">' + formatCurrency(daySum) + '</span></div></div>';
+                }).join('');
+            }
+            renderAnalytics(monthData, dayTotals, daysInMonth);
+        }
+
+        function renderAnalytics(monthData, dayTotals, daysInMonth) {
+            const labels = [], data = [];
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayKey = currentMonth.getFullYear() + '-' + String(currentMonth.getMonth() + 1).padStart(2, '0') + '-' + String(i).padStart(2, '0');
+                labels.push(i); data.push(dayTotals[dayKey] || 0);
+            }
+            const trendCtx = document.getElementById('trendChart').getContext('2d');
+            if (trendChartInstance) trendChartInstance.destroy();
+            trendChartInstance = new Chart(trendCtx, {
+                type: 'line',
+                data: { labels: labels, datasets: [{ label: 'Daily Spending', data: data, borderColor: '#00d4aa', backgroundColor: 'rgba(0, 212, 170, 0.1)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#00d4aa', pointBorderColor: '#0a0a0f', pointBorderWidth: 2 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#12121a', titleColor: '#fff', bodyColor: '#a0a0b0', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, callbacks: { label: (ctx) => '\u20b9' + ctx.parsed.y.toFixed(2) } } },
+                    scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#606070', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#606070', font: { size: 10 }, callback: (v) => '\u20b9' + v } } }
+                }
+            });
+
+            const catTotals = {};
+            Object.values(monthData).forEach(entries => { entries.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; }); });
+            const catCtx = document.getElementById('categoryChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            const catLabels = Object.keys(catTotals).map(k => CATEGORIES[k]?.label || k);
+            const catData = Object.values(catTotals);
+            const catColors = Object.keys(catTotals).map(k => CATEGORIES[k]?.color || '#666');
+            categoryChartInstance = new Chart(catCtx, {
+                type: 'doughnut',
+                data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0, hoverOffset: 8 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { color: '#a0a0b0', font: { size: 10 }, padding: 15, usePointStyle: true } } } }
+            });
+
+            const totalMonthly = Object.values(dayTotals).reduce((a, b) => a + b, 0);
+            const sortedDayTotals = Object.entries(dayTotals).sort((a, b) => b[1] - a[1]);
+            const highestDay = sortedDayTotals[0];
+            const lowestDay = sortedDayTotals[sortedDayTotals.length - 1];
+            const mid = Math.floor(data.length / 2);
+            const firstHalf = data.slice(0, mid).reduce((a, b) => a + b, 0);
+            const secondHalf = data.slice(mid).reduce((a, b) => a + b, 0);
+            const trend = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf * 100).toFixed(1) : 0;
+            const trendColor = parseFloat(trend) < 0 ? 'accent' : 'warning';
+            const catCounts = {};
+            Object.values(monthData).forEach(entries => { entries.forEach(e => { catCounts[e.category] = (catCounts[e.category] || 0) + 1; }); });
+            const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
+            const allEntries = Object.values(monthData).flat();
+
+            document.getElementById('insightsGrid').innerHTML =
+                '<div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(0,212,170,0.15)">&#128201;</div><div class="insight-title">Spending Trend</div></div><div class="insight-value ' + trendColor + '">' + (trend > 0 ? '+' : '') + trend + '%</div><div class="insight-sub">Second half vs first half of month</div></div>' +
+                '<div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(245,158,11,0.15)">&#128293;</div><div class="insight-title">Highest Spend Day</div></div><div class="insight-value warning">' + (highestDay ? formatCurrency(highestDay[1]) : '\u20b90.00') + '</div><div class="insight-sub">' + (highestDay ? new Date(highestDay[0] + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'No data') + '</div></div>' +
+                '<div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(16,185,129,0.15)">&#128154;</div><div class="insight-title">Lowest Spend Day</div></div><div class="insight-value" style="color:var(--success)">' + (lowestDay ? formatCurrency(lowestDay[1]) : '\u20b90.00') + '</div><div class="insight-sub">' + (lowestDay ? new Date(lowestDay[0] + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'No data') + '</div></div>' +
+                '<div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(139,92,246,0.15)">&#127991;</div><div class="insight-title">Top Category</div></div><div class="insight-value secondary">' + (topCat ? CATEGORIES[topCat[0]]?.icon + ' ' + CATEGORIES[topCat[0]]?.label : 'None') + '</div><div class="insight-sub">' + (topCat ? formatCurrency(catTotals[topCat[0]]) + ' total' : 'No expenses yet') + '</div></div>' +
+                '<div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(59,130,246,0.15)">&#128202;</div><div class="insight-title">Avg per Transaction</div></div><div class="insight-value">' + formatCurrency(totalMonthly / (allEntries.length || 1)) + '</div><div class="insight-sub">Across all categories</div></div>' +
+                '<div class="insight-card"><div class="insight-header"><div class="insight-icon" style="background:rgba(236,72,153,0.15)">&#127919;</div><div class="insight-title">Projected Monthly</div></div><div class="insight-value" style="color:#ec4899">' + formatCurrency((totalMonthly / (Object.keys(dayTotals).length || 1)) * daysInMonth) + '</div><div class="insight-sub">If spending continues at this rate</div></div>';
+        }
+
+        function addExpense() {
+            const dateVal = document.getElementById('expDate').value;
+            const desc = document.getElementById('expDesc').value.trim();
+            const category = document.getElementById('expCategory').value;
+            const amount = parseFloat(document.getElementById('expAmount').value);
+
+            if (!dateVal) { showToast('&#9888; Please select a date'); return; }
+            if (!desc || isNaN(amount) || amount <= 0) { showToast('&#9888; Please enter a description and valid amount'); return; }
+
+            const selectedDate = new Date(dateVal + 'T00:00:00');
+            const monthKey = getMonthKey(selectedDate);
+            const dayKey = getDayKey(selectedDate);
+            const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+            if (!expenses[monthKey]) expenses[monthKey] = {};
+            if (!expenses[monthKey][dayKey]) expenses[monthKey][dayKey] = [];
+
+            expenses[monthKey][dayKey].push({ desc, category, amount, time, timestamp: Date.now() });
+
+            saveData();
+            if (monthKey !== getMonthKey(currentMonth)) currentMonth = new Date(selectedDate);
+            render();
+            document.getElementById('expDesc').value = '';
+            document.getElementById('expAmount').value = '';
+            document.getElementById('expDesc').focus();
+            showToast('&#9989; Added ' + formatCurrency(amount) + ' for ' + desc);
+        }
+
+        function deleteEntry(dayKey, index) {
+            const monthKey = getMonthKey(currentMonth);
+            if (expenses[monthKey] && expenses[monthKey][dayKey]) {
+                expenses[monthKey][dayKey].splice(index, 1);
+                if (expenses[monthKey][dayKey].length === 0) delete expenses[monthKey][dayKey];
+                saveData(); render();
+                showToast('&#128465; Entry deleted');
+            }
+        }
+
+        function changeMonth(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); render(); }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            const clickedTab = Array.from(document.querySelectorAll('.tab')).find(t => t.textContent.toLowerCase().includes(tab));
+            if (clickedTab) clickedTab.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+            if (tab === 'analytics') setTimeout(() => render(), 50);
+        }
+
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 }).format(num || 0);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function setupEnterKey() {
+            document.getElementById('expAmount').addEventListener('keypress', (e) => { if (e.key === 'Enter') addExpense(); });
+            document.getElementById('expDesc').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('expAmount').focus(); });
+        }
+
+        init();
+        setupEnterKey();
+        setupDropdownClose();
+    </script>
+
+</body></html>
